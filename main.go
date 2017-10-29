@@ -52,7 +52,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	city := strings.SplitN(r.URL.Path, "/", 10)[2]
 	fmt.Println(strings.SplitN(r.URL.Path, "/", 10))
 
-	temp, err := mw.temperature(city)
+	celsius, err := mw.temperature(city)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -61,13 +61,14 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 	//data.Main.Temp -= K_TO_C
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	json.NewEncoder(w).Encode(map[string]interface{}{
-		"city": city,
-		"temp": temp,
-		"took": time.Since(begin).String(),
+		"city":    city,
+		"celsius": celsius,
+		"took":    time.Since(begin).String(),
 	})
 }
 
 func (w openWeatherMap) temperature(city string) (float64, error) {
+	//log.Print("openWeatherMap=", w.apiKey)
 	resp, err := http.Get("http://api.openweathermap.org/data/2.5/weather?APPID=" + w.apiKey + "&q=" + city)
 	if err != nil {
 		return 0, err
@@ -85,12 +86,14 @@ func (w openWeatherMap) temperature(city string) (float64, error) {
 		return 0, err
 	}
 
-	log.Printf("openWeatherMap: %s: %.2f", city, d.Main.Temp)
-	return d.Main.Temp, nil
+	temp := d.Main.Temp - CelsiusToKelvin
+	log.Printf("openWeatherMap: %s: %.2f", city, temp)
+	return temp, nil
 }
 
 func (w weatherUnderground) temperature(city string) (float64, error) {
-	resp, err := http.Get("http://api.wunderground.com/api/" + w.apiKey + "/conditions/q/" + city + ".json")
+	//log.Print("weatherUnderground", w.apiKey)
+	resp, err := http.Get("http://api.wunderground.com/api/" + w.apiKey + "/conditions/q/Japan/" + city + ".json")
 	if err != nil {
 		return 0, err
 	}
@@ -107,10 +110,10 @@ func (w weatherUnderground) temperature(city string) (float64, error) {
 		return 0, err
 	}
 
-	kelvin := d.Observation.Celsius + CelsiusToKelvin
-	log.Printf("weatherUnderground: %s: %.2f", city, kelvin)
+	temp := d.Observation.Celsius
+	log.Printf("weatherUnderground: %s: %.2f", city, temp)
 
-	return kelvin, nil
+	return temp, nil
 }
 
 func (w multiWeatherProvider) temperature(city string) (float64, error) {
