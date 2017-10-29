@@ -10,7 +10,8 @@ import (
 	"time"
 )
 
-//const K_TO_C = 273.15
+// CelsiusToKelvin for convert from Celsius to Kelvin.
+const CelsiusToKelvin = 273.15
 
 type weatherProvider interface {
 	temperature(city string) (float64, error)
@@ -106,7 +107,7 @@ func (w weatherUnderground) temperature(city string) (float64, error) {
 		return 0, err
 	}
 
-	kelvin := d.Observation.Celsius + K_TO_C
+	kelvin := d.Observation.Celsius + CelsiusToKelvin
 	log.Printf("weatherUnderground: %s: %.2f", city, kelvin)
 
 	return kelvin, nil
