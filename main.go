@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -50,7 +49,7 @@ func getWeather(w http.ResponseWriter, r *http.Request) {
 
 	begin := time.Now()
 	city := strings.SplitN(r.URL.Path, "/", 10)[2]
-	fmt.Println(strings.SplitN(r.URL.Path, "/", 10))
+	log.Println(strings.SplitN(r.URL.Path, "/", 10))
 
 	celsius, err := mw.temperature(city)
 	if err != nil {
@@ -117,16 +116,36 @@ func (w weatherUnderground) temperature(city string) (float64, error) {
 }
 
 func (w multiWeatherProvider) temperature(city string) (float64, error) {
-	sum := 0.0
+	// Make a channel for temperatures, and a channel for errors.
+	// Each provider will push a value into only one.
+	temps := make(chan float64, len(w))
+	errs := make(chan error, len(w))
 
+	// For each provider, spawn a goroutine with an anonymous function.
+	// That function will invoke the temperature method, and forward the response.
 	for _, provider := range w {
-		k, err := provider.temperature(city)
-		if err != nil {
-			return 0, err
-		}
-
-		sum += k
+		go func(p weatherProvider) {
+			k, err := p.temperature(city)
+			if err != nil {
+				errs <- err
+				return
+			}
+			temps <- k
+		}(provider)
 	}
 
+	sum := 0.0
+
+	// Collect a temperature or an error from each provider.
+	for i := 0; i < len(w); i++ {
+		select {
+		case temp := <-temps:
+			sum += temp
+		case err := <-errs:
+			return 0, err
+		}
+	}
+
+	// Return the average, same as before.
 	return sum / float64(len(w)), nil
 }
